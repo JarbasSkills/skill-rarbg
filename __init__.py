@@ -15,7 +15,7 @@ class RARBGSkill(OVOSCommonPlaybackSkill):
         self.rarbg = RarbgAPI()
         self.skill_icon = join(dirname(__file__), "ui", "logo.png")
 
-    def calc_score(self, phrase, torrent, media_type, idx=0):
+    def calc_score(self, phrase, torrent, media_type, idx=0, base_score=0):
         if torrent.seeders < 1:
             return 0
         removes = ["WEBRip", "x265", "HDR", "DTS", "HD", "BluRay", "uhd",
@@ -27,11 +27,11 @@ class RARBGSkill(OVOSCommonPlaybackSkill):
         clean_name = torrent.filename.replace(".", " ").replace("-", " ")
         clean_name = " ".join([w for w in clean_name.split()
                                if w and w.lower() not in removes])
-
-        score = fuzzy_match(phrase.lower(), clean_name) * 100
+        score = base_score - idx
+        score += fuzzy_match(phrase.lower(), clean_name) * 100
         if media_type == MediaType.MOVIE:
             score += 15
-        return score - idx
+        return score
 
     @ocp_search()
     def search_torrents(self, phrase, media_type):
@@ -50,16 +50,23 @@ class RARBGSkill(OVOSCommonPlaybackSkill):
 
         # no accidental porn results!
         if self.voc_match(phrase, "porn") or media_type == MediaType.ADULT:
+            phrase = self.remove_voc(phrase, "porn")
             categories.append(RarbgAPI.CATEGORY_ADULT)
+
+        base_score = 0
+        if self.voc_match(phrase, "torrent"):
+            phrase = self.remove_voc(phrase, "torrent")
+            base_score = 40
 
         torrents = self.rarbg.search(search_string=phrase,
                                      categories=categories,
                                      extended_response=True)
         torrents = sorted(torrents, key=lambda k: k.seeders, reverse=True)
+
         return [{
             "title": torrent.filename,
             "match_confidence": self.calc_score(phrase, torrent, media_type,
-                                                idx),
+                                                idx, base_score),
             "media_type": MediaType.VIDEO,
             "uri": torrent.download,
             "playback": PlaybackType.SKILL,
