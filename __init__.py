@@ -58,9 +58,12 @@ class RARBGSkill(OVOSCommonPlaybackSkill):
             phrase = self.remove_voc(phrase, "torrent")
             base_score = 40
 
-        torrents = self.rarbg.search(search_string=phrase,
-                                     categories=categories,
-                                     extended_response=True)
+        try:
+            torrents = self.rarbg.search(search_string=phrase,
+                                         categories=categories,
+                                         extended_response=True)
+        except:
+            return  # probably rate limited
         torrents = sorted(torrents, key=lambda k: k.seeders, reverse=True)
 
         return [{
